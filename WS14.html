@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OKX Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 15px; }
+    .menu { margin-bottom: 10px; }
+    .menu button { padding: 5px 10px; margin-right: 10px; cursor: pointer; }
+    .menu button.active { background-color: black; color: white; }
+    .controls { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    input, select { padding: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 6px; text-align: center; border-bottom: 1px solid #ccc; font-size: 13px; }
+    th { background: #eee; cursor: pointer; }
+    th.active { color: red; }
+    tr.highlight td.flash { background-color: var(--flash-color); transition: background-color 2s ease; }
+    a { color: #007bff; text-decoration: none; }
+    .favorite { cursor: pointer; font-size: 22px; }
+    .favorite.starred { color: gold; }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #eee;
+    }
+    #loader { height: 4px; background: lightblue; width: 0%; transition: width 0.5s; }
+    #lastUpdated { margin-top: 10px; font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+
+<h1>OKX Dashboard</h1>
+
+<div class="menu">
+  <button id="tab-gainers" class="active">Gainers</button>
+  <button id="tab-favorites">Favorites</button>
+</div>
+
+<div class="controls">
+  <label>Search:</label>
+  <input type="text" id="searchInput" placeholder="Search pair...">
+  <label>Flash Color:</label>
+  <select id="flashColor">
+    <option value="lightgreen" selected>Light Green</option>
+    <option value="lightyellow">Light Yellow</option>
+    <option value="lightblue">Light Blue</option>
+    <option value="lightpink">Light Pink</option>
+  </select>
+  <label>Refresh (s):</label>
+  <select id="refreshSpeed">
+    <option value="1000">1s</option>
+    <option value="3000" selected>3s</option>
+    <option value="5000">5s</option>
+  </select>
+</div>
+<div class="controls">
+  <label>Thresholds:</label>
+  1s <input type="number" id="threshold1s" value="0.3" step="0.1" style="width:50px;">
+  5s <input type="number" id="threshold5s" value="0.5" step="0.1" style="width:50px;">
+  30s <input type="number" id="threshold30s" value="0.8" step="0.1" style="width:50px;">
+  1m <input type="number" id="threshold1m" value="1" step="0.1" style="width:50px;">
+  3m <input type="number" id="threshold3m" value="1" step="0.1" style="width:50px;">
+  5m <input type="number" id="threshold5m" value="2" step="0.1" style="width:50px;">
+  10m <input type="number" id="threshold10m" value="2" step="0.1" style="width:50px;">
+  30m <input type="number" id="threshold30m" value="5" step="0.1" style="width:50px;">
+  1h <input type="number" id="threshold1h" value="5" step="0.1" style="width:50px;">
+  1h C <input type="number" id="threshold1hC" value="5" step="0.1" style="width:50px;">
+  2h <input type="number" id="threshold2h" value="5" step="0.1" style="width:50px;">
+  4h <input type="number" id="threshold4h" value="5" step="0.1" style="width:50px;">
+  6h <input type="number" id="threshold6h" value="5" step="0.1" style="width:50px;">
+  12h <input type="number" id="threshold12h" value="5" step="0.1" style="width:50px;">
+  1d <input type="number" id="threshold1d" value="5" step="0.1" style="width:50px;">
+  1w <input type="number" id="threshold1w" value="10" step="0.1" style="width:50px;">
+</div>
+
+<div id="loader"></div>
+<div id="lastUpdated">Last Updated: --</div>
+<div id="loader"></div>
+<div id="scanningProgress" style="margin-top:5px; font-size:12px; text-align:center;">Scanning: 0/0</div>
+
+<table>
+  <thead>
+    <tr id="headerRow">
+      <th class="static">#</th>
+      <th id="sortFavorite">★</th>
+      <th id="sortPair">Pair 🔽</th>
+      <th class="static">Last Price</th>
+      <th class="static">Trend</th>
+      <th id="sort1s">1s 🔽</th>
+      <th id="sort5s">5s 🔽</th>
+      <th id="sort30s">30s 🔽</th>
+      <th id="sort1m">1m 🔽</th>
+      <th id="sort3m">3m 🔽</th>
+      <th id="sort5m">5m 🔽</th>
+      <th id="sort10m">10m 🔽</th>
+      <th id="sort30m">30m 🔽</th>
+      <th id="sort1hL">1h L 🔽</th>
+      <th id="sort1hC">1h C 🔽</th>
+      <th id="sort2h">2h 🔽</th>
+      <th id="sort4h">4h 🔽</th>
+      <th id="sort6h">6h 🔽</th>
+      <th id="sort12h">12h 🔽</th>
+      <th id="sort1d">1d 🔽</th>
+      <th id="sort1w">1w 🔽</th>
+      <th id="sortTurnover">Turnover 🔽</th>
+      <th id="sortConfidence">Confidence 🔽</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
+<div id="pagination" style="text-align:center; margin-top:10px;">
+  <button id="prevPage">Previous</button>
+  <span id="pageInfo">Page 1</span>
+  <button id="nextPage">Next</button> <label style="margin-left:10px;"><input type="checkbox" id="seeAllToggle"> See All</label>
+</div>
+
+<script>
+const tableBody = document.getElementById('tableBody');
+const headerRow = document.getElementById('headerRow');
+const searchInput = document.getElementById('searchInput');
+const flashColorPicker = document.getElementById('flashColor');
+const refreshSpeed = document.getElementById('refreshSpeed');
+const tabGainers = document.getElementById('tab-gainers');
+const tabFavorites = document.getElementById('tab-favorites');
+const loader = document.getElementById('loader');
+const lastUpdated = document.getElementById('lastUpdated');
+
+let prices = {}, turnover = {}, history = {}, candles = {}, favorites = new Set(JSON.parse(localStorage.getItem('favorites') || '[]'));
+let sortField = "coin", sortDir = 1, activeTab = 'gainers';
+let alertedCoins = new Set();
+const alertSound = new Audio('https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg');
+let refreshTimer = null, candleTimer = null, lastFlashTime = {};
+
+let currentPage = 1;
+const itemsPerPage = 30;
+
+function renderPageNumbers(totalPages) {
+  const container = document.getElementById("pageInfo");
+  container.innerHTML = "";
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = i;
+    btn.style.margin = "0 3px";
+    btn.onclick = () => {
+      currentPage = i;
+      updateTable();
+    };
+    if (i === currentPage) {
+      btn.style.fontWeight = "bold";
+      btn.style.background = "#333";
+      btn.style.color = "white";
+    }
+    container.appendChild(btn);
+  }
+}
+
+
+document.getElementById("prevPage").onclick = () => {
+  if (currentPage > 1) {
+    currentPage--;
+    updateTable();
+  }
+};
+
+document.getElementById("nextPage").onclick = () => {
+  currentPage++;
+  updateTable();
+};
+
+
+const thresholds = {
+  "1s": document.getElementById('threshold1s'),
+  "5s": document.getElementById('threshold5s'),
+  "30s": document.getElementById('threshold30s'),
+  "1m": document.getElementById('threshold1m'),
+  "3m": document.getElementById('threshold3m'),
+  "5m": document.getElementById('threshold5m'),
+  "10m": document.getElementById('threshold10m'),
+  "30m": document.getElementById('threshold30m'),
+  "1hL": document.getElementById('threshold1h'),
+  "1hC": document.getElementById('threshold1hC'),
+  "2h": document.getElementById('threshold2h'),
+  "4h": document.getElementById('threshold4h'),
+  "6h": document.getElementById('threshold6h'),
+  "12h": document.getElementById('threshold12h'),
+  "1d": document.getElementById('threshold1d'),
+  "1w": document.getElementById('threshold1w')
+};
+
+function keepHistory(coin, price) {
+  const now = Date.now();
+  if (!history[coin]) history[coin] = [];
+  history[coin].push({ price, time: now });
+  history[coin] = history[coin].filter(p => now - p.time <= 3600000);
+}
+
+function findClosest(coin, msAgo) {
+  const target = Date.now() - msAgo;
+  if (!history[coin]) return null;
+  const candidates = history[coin].filter(p => p.time <= target);
+  return candidates.length ? candidates[candidates.length - 1] : null;
+}
+
+function calcChange(coin, msAgo) {
+  const nowPrice = prices[coin];
+  const past = findClosest(coin, msAgo);
+  if (!past || !past.price) return 0;
+  return ((nowPrice - past.price) / past.price) * 100;
+}
+
+function toggleFavorite(coin) {
+  if (favorites.has(coin)) favorites.delete(coin);
+  else favorites.add(coin);
+  localStorage.setItem('favorites', JSON.stringify(Array.from(favorites)));
+  updateTable();
+}
+
+function renderCell(coin, change, tf) {
+  const color = change >= 0 ? 'green' : 'red';
+  const key = `${coin}_${tf}`;
+  const now = Date.now();
+  let style = `color:${color};`;
+
+  if (parseFloat(thresholds[tf].value) !== undefined && change >= parseFloat(thresholds[tf].value)) lastFlashTime[key] = now;
+  if (lastFlashTime[key] && (now - lastFlashTime[key]) <= 3000) {
+    style += `background-color:${flashColorPicker.value}; transition: background-color 2s ease;`;
+  }
+  return `<td style="${style}">${change?.toFixed(2)}%</td>`;
+}
+
+function formatTurnover(v) {
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(2) + "K";
+  return v?.toFixed(2);
+}
+function confidenceScore(d) {
+  let score = 0;
+
+  if (d["1s"] > 0) score += 6; else if (d["1s"] < 0) score -= 5;
+  if (d["5s"] > 0) score += 5; else if (d["5s"] < 0) score -= 4;
+  if (d["30s"] > 0) score += 4; else if (d["30s"] < 0) score -= 3;
+  if (d["1m"] > 0) score += 4; else if (d["1m"] < 0) score -= 4;
+  if (d["3m"] > 0) score += 2; else if (d["3m"] < 0) score -= 2;
+  if (d["5m"] > 0) score += 1.5; else if (d["5m"] < 0) score -= 1.5;
+  if (d["10m"] > 0) score += 1; else if (d["10m"] < 0) score -= 1.5;
+  if (d["30m"] > 0) score += 0.5; else if (d["30m"] < 0) score -= 0.5;
+  if (d["1hC"] > 0) score += 1; else if (d["1hC"] < 0) score -= 1;
+  if (d["2h"] > 0) score += 1; else if (d["2h"] < 0) score -= 1;
+  if (d["4h"] > 0) score += 1; else if (d["4h"] < 0) score -= 1;
+  if (d["6h"] > 0) score += 1; else if (d["6h"] < 0) score -= 1;
+  if (d["12h"] > 0) score += 0.5; else if (d["12h"] < 0) score -= 0.5;
+  if (d["1d"] > 2) score += 1;
+  else if (d["1d"] < -5) score -= 1;
+  if (d["1w"] > 5) score += 1;
+  else if (d["1w"] < -10) score -= 1;
+  const t = d.turnover || 0;
+  if (t <= 500000) score -= 5;
+  else if (t <= 1000000) score -= 2;
+  else if (t <= 5000000) score += 0;
+  else if (t <= 10000000) score += 2;
+  else score += 3;
+  return score;
+}
+
+
+function confidenceColor(score) {
+  const pct = (score + 15) / 30;
+  const r = Math.round(255 * (1 - pct));
+  const g = Math.round(255 * pct);
+  return `background-color:rgb(${r},${g},0);color:white;padding:4px 8px;border-radius:4px;`;
+}
+
+function updateTable() {
+  let data = Object.keys(prices).map(coin => ({
+    coin,
+    price: prices[coin],
+    turnover: turnover[coin] || 0,
+    change1s: calcChange(coin, 1000),
+    change5s: calcChange(coin, 5000),
+    change30s: calcChange(coin, 30000),
+    change1m: calcChange(coin, 60000),
+    change3m: calcChange(coin, 180000),
+    change5m: calcChange(coin, 300000),
+    change10m: calcChange(coin, 600000),
+    change30m: calcChange(coin, 1800000),
+    change1hL: calcChange(coin, 3600000),
+    ...(candles[coin] || {})
+  }));
+
+  if (activeTab === 'favorites') {
+    data = data.filter(d => favorites.has(d.coin));
+  }
+
+  const search = searchInput.value.toLowerCase();
+  if (search) data = data.filter(d => d.coin.toLowerCase().includes(search));
+
+  const sortKey = sortField === "1hL" ? "change1hL" : sortField;
+  data.sort((a, b) => {
+    if (sortField === "coin") return sortDir * a.coin.localeCompare(b.coin);
+    if (sortField === "turnover") return sortDir * (b.turnover - a.turnover);
+    if (sortField === "confidence") return sortDir * (confidenceScore(b) - confidenceScore(a));
+    return sortDir * ((b[sortKey] || 0) - (a[sortKey] || 0));
+  });
+
+  tableBody.innerHTML = "";
+  
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const visibleData = seeAll ? data : data.slice(startIdx, endIdx);
+  if (!seeAll) renderPageNumbers(totalPages); else document.getElementById('pageInfo').innerHTML = 'All';
+
+  visibleData.forEach((d, i) => {
+    const globalIndex = startIdx + i;
+
+    const favStar = favorites.has(d.coin) ? '⭐' : '☆';
+    const conf = confidenceScore(d);
+    const row = document.createElement('tr');
+
+    const alertThresholds = ["1s", "5s", "30s", "1m", "3m", "5m"]; //CHANGED LESS TIMEFRAME ALERT
+    const passesAll = alertThresholds.every(tf => {
+      const val = d["change" + tf] ?? 0;
+      const threshold = parseFloat(thresholds[tf]?.value || 999);
+      return Math.abs(val) >= threshold;
+    });
+
+    if (passesAll && !alertedCoins.has(d.coin)) {
+      alertSound.play().catch(() => {});
+      alertedCoins.add(d.coin);
+      setTimeout(() => alertedCoins.delete(d.coin), 5000);
+    }
+
+    row.innerHTML = `
+      <td>${globalIndex + 1}</td>
+      <td><span class="favorite" onclick="toggleFavorite('${d.coin}')">${favStar}</span></td>
+      <td><a href="https://www.okx.com/trade-spot/${d.coin}" target="_blank">${d.coin.replace("-USDT","")}</a></td>
+      <td>${d.price?.toFixed(6)} ${renderTrendArrow(d.change1m)}</td>
+      <td></td>
+      ${renderCell(d.coin, d.change1s, "1s")}
+      ${renderCell(d.coin, d.change5s, "5s")}
+      ${renderCell(d.coin, d.change30s, "30s")}
+      ${renderCell(d.coin, d.change1m, "1m")}
+      ${renderCell(d.coin, d.change3m, "3m")}
+      ${renderCell(d.coin, d.change5m, "5m")}
+      ${renderCell(d.coin, d.change10m, "10m")}
+      ${renderCell(d.coin, d.change30m, "30m")}
+      ${renderCell(d.coin, d.change1hL, "1hL")}
+      ${renderCell(d.coin, d["1hC"], "1hC")}
+      ${renderCell(d.coin, d["2h"], "2h")}
+      ${renderCell(d.coin, d["4h"], "4h")}
+      ${renderCell(d.coin, d["6h"], "6h")}
+      ${renderCell(d.coin, d["12h"], "12h")}
+      ${renderCell(d.coin, d["1d"], "1d")}
+      ${renderCell(d.coin, d["1w"], "1w")}
+      <td>${formatTurnover(d.turnover)}</td>
+      <td><div style="${confidenceColor(conf)}">${conf}</div></td>
+    `;
+    
+    if (row.children[4]) row.children[4].appendChild(renderSparkline(d.coin));
+tableBody.appendChild(row);
+  });
+
+  updateHeaders();
+  lastUpdated.innerText = "Last Updated: " + new Date().toLocaleTimeString();
+}
+
+function updateHeaders() {
+  Array.from(headerRow.children).forEach(th => {
+    if (th.classList.contains('static')) return;
+    th.classList.remove("active");
+    const key = th.id.replace("sort", "");
+    if (key.toLowerCase() === sortField.replace("change", "").toLowerCase()) {
+      th.classList.add("active");
+      th.innerText = th.innerText.replace(/(🔽|🔼)?$/, sortDir > 0 ? " 🔼" : " 🔽");
+    } else {
+      th.innerText = th.innerText.replace(/(🔽|🔼)?$/, " 🔽");
+    }
+  });
+}
+
+let candleScanRunning = false;
+
+
+// --- Injected ping + reconnect logic ---
+function addKeepAliveAndReconnect(ws, instIds) {
+  const pingInterval = 20000; // 20 seconds
+  let pingTimer = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send('ping');
+    }
+  }, pingInterval);
+
+  ws.onclose = () => {
+    clearInterval(pingTimer);
+    setTimeout(() => {
+      const newWs = createSocket(instIds);
+      addKeepAliveAndReconnect(newWs, instIds);
+    }, 3000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+}
+
+function createSocket(instIds) {
+  const ws = new WebSocket('wss://ws.okx.com:8443/ws/v5/public');
+  ws.onopen = () => {
+    const args = instIds.map(instId => ({ channel: "tickers", instId }));
+    ws.send(JSON.stringify({ op: "subscribe", args }));
+  };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.arg && data.arg.channel === "tickers" && data.data) {
+      const coin = data.data[0].instId;
+      const last = parseFloat(data.data[0].last);
+      const volCcy24h = parseFloat(data.data[0].volCcy24h);
+      prices[coin] = last;
+      turnover[coin] = volCcy24h;
+      keepHistory(coin, last);
+    }
+  };
+  return ws;
+}
+
+async function startWebSocket() {
+  const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+  const json = await res.json();
+  const usdtPairs = json.data.filter(t => t.instId.endsWith('USDT')).map(t => t.instId);
+
+  const chunks = [];
+  while (usdtPairs.length) chunks.push(usdtPairs.splice(0, 100));
+
+  chunks.forEach(chunk => {
+    const ws = createSocket(chunk);
+    addKeepAliveAndReconnect(ws, chunk);
+  });
+}
+// --- End Injected Section ---
+
+
+async function fetchCandles() {
+  if (candleScanRunning) return;
+  candleScanRunning = true;
+
+  try {
+    const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+    const coins = (await res.json()).data.filter(t => t.instId.endsWith('USDT')).map(t => t.instId);
+    loader.style.width = '5%';
+    document.getElementById('scanningProgress').innerText = `Scanning: 0/${coins.length * 7}`;
+
+    const timeframes = [
+      ["1H", "1hC"],
+      ["2H", "2h"],
+      ["4H", "4h"],
+      ["6H", "6h"],
+      ["12H", "12h"],
+      ["1D", "1d"],
+      ["1W", "1w"]
+    ];
+
+    let totalSteps = coins.length * timeframes.length;
+    let currentStep = 0;
+
+    for (let [bar, label] of timeframes) {
+      for (let i = 0; i < coins.length; i += 20) {
+        const batch = coins.slice(i, i + 20);
+        await Promise.all(batch.map(async (coin) => {
+          try {
+            const r = await fetch(`https://www.okx.com/api/v5/market/candles?instId=${coin}&bar=${bar}&limit=1`);
+            const j = await r.json();
+            if (j.data && j.data.length) {
+              const open = parseFloat(j.data[0][1]);
+              const close = parseFloat(j.data[0][4]);
+              if (!candles[coin]) candles[coin] = {};
+              candles[coin][label] = ((close - open) / open) * 100;
+            }
+          } catch (e) {}
+          currentStep++;
+          loader.style.width = `${(currentStep / totalSteps) * 100}%`;
+          document.getElementById('scanningProgress').innerText = `Scanning: ${currentStep}/${totalSteps}`;
+        }));
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 20 calls/sec
+      }
+    }
+  } catch (e) {
+    console.error("Candle scan failed:", e);
+  } finally {
+    loader.style.width = '0%';
+    document.getElementById('scanningProgress').innerText = `Scanning: Finished`;
+    candleScanRunning = false;
+  }
+}
+
+let sockets = [];
+
+async function startWebSocket() {
+  const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+  const list = (await res.json()).data.filter(t => t.instId.endsWith('USDT')).map(t => t.instId);
+
+  while (list.length) {
+    const chunk = list.splice(0, 100);
+    createWebSocket(chunk);
+  }
+}
+
+function createWebSocket(chunk) {
+  const ws = new WebSocket('wss://ws.okx.com:8443/ws/v5/public');
+  sockets.push(ws);
+
+  let pingInterval;
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      op: "subscribe",
+      args: chunk.map(c => ({ channel: "tickers", instId: c }))
+    }));
+
+    pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send('ping');
+      }
+    }, 20000); // Ping every 20s
+  };
+
+  ws.onmessage = (e) => {
+    if (!e.data.startsWith('{')) {
+      if (e.data === 'pong') return;
+      console.warn('Unknown non-JSON message:', e.data);
+      return;
+    }
+
+    const d = JSON.parse(e.data);
+    if (!d.data) return;
+    const coin = d.data[0].instId;
+    const price = parseFloat(d.data[0].last);
+    const turn = parseFloat(d.data[0].volCcy24h);
+    prices[coin] = price;
+    turnover[coin] = turn;
+    keepHistory(coin, price);
+  };
+
+  ws.onerror = (err) => {
+    console.error('WebSocket error', err);
+  };
+
+  ws.onclose = () => {
+    console.warn('WebSocket closed, reconnecting...');
+    clearInterval(pingInterval);
+    sockets = sockets.filter(s => s !== ws);
+    setTimeout(() => createWebSocket(chunk), 1000);
+  };
+}
+
+function setupRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(updateTable, parseInt(refreshSpeed.value));
+}
+
+refreshSpeed.onchange = setupRefresh;
+
+tabGainers.onclick = () => {
+  activeTab = 'gainers';
+  tabGainers.classList.add('active');
+  tabFavorites.classList.remove('active');
+  updateTable();
+};
+
+tabFavorites.onclick = () => {
+  activeTab = 'favorites';
+  tabFavorites.classList.add('active');
+  tabGainers.classList.remove('active');
+  updateTable();
+};
+
+[
+  "sortFavorite", "sortPair", "sort1s", "sort5s", "sort30s", "sort1m", "sort3m", "sort5m",
+  "sort10m", "sort30m", "sort1hL", "sort1hC", "sort2h", "sort4h", "sort6h",
+  "sort12h", "sort1d", "sort1w", "sortTurnover", "sortConfidence"
+].forEach(id => {
+  const th = document.getElementById(id);
+  if (th) {
+    th.onclick = () => {
+      let newField = id.replace("sort", "");
+
+      if (newField === "Favorite") return;
+      if (newField === "Pair") {
+        sortField = "coin";
+      } else if (["Confidence", "Turnover"].includes(newField)) {
+        sortField = newField.toLowerCase();
+      } else if (["1hL", "1hC", "2h", "4h", "6h", "12h", "1d", "1w"].includes(newField)) {
+  	sortField = newField;
+      } else {
+        sortField = "change" + newField.toLowerCase();
+      }
+
+      sortDir *= -1;
+      updateTable();
+    };
+  }
+});
+
+
+let seeAll = false;
+
+document.getElementById("seeAllToggle").addEventListener("change", function() {
+  seeAll = this.checked;
+  currentPage = 1;
+  updateTable();
+});
+
+// Start everything
+startWebSocket();
+setupRefresh();
+fetchCandles();
+candleTimer = setInterval(fetchCandles, 600000);
+
+function renderSparkline(coin) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 80;
+  canvas.height = 20;
+  const ctx = canvas.getContext("2d");
+  const raw = history[coin] || [];
+  if (raw.length < 2) return canvas;
+
+  // Downsample to 1 point per minute
+  const grouped = {};
+  raw.forEach(p => {
+    const minKey = Math.floor(p.time / 60000); // minute bucket
+    grouped[minKey] = p.price;
+  });
+  const minutes = Object.keys(grouped).sort();
+  const prices = minutes.map(k => grouped[k]);
+
+  if (prices.length < 2) return canvas;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const len = prices.length;
+
+  ctx.beginPath();
+  ctx.strokeStyle = "#007bff";
+  prices.forEach((p, i) => {
+    const x = (i / (len - 1)) * canvas.width;
+    const y = canvas.height - ((p - min) / (max - min)) * canvas.height;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  return canvas;
+}
+
+</script>
+
+
+<script>
+// === WebSocket Keepalive + Reconnect Logic ===
+let ws;
+function openWebSocket() {
+  ws = new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
+
+  ws.onopen = () => {
+    console.log("WebSocket connected.");
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send("ping");
+      }
+    }, 20000); // Keepalive ping every 20s
+  };
+
+  ws.onclose = () => {
+    console.warn("WebSocket disconnected. Reconnecting in 3s...");
+    setTimeout(openWebSocket, 3000);
+  };
+
+  ws.onerror = (err) => {
+    console.error("WebSocket error:", err);
+    ws.close();
+  };
+
+  ws.onmessage = (event) => {
+    // Processing done elsewhere
+  };
+}
+openWebSocket();
+
+// === Trend Arrow Rendering ===
+function renderTrendArrow(change) {
+  if (change > 1) return '↑';
+  if (change < -1) return '↓';
+  return '↔';
+}
+</script>
+
+</body>
+</html>
